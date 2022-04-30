@@ -753,6 +753,7 @@ export class OpenSeaPort {
     paymentTokenAddress,
     sellOrder,
     referrerAddress,
+    payloadOnly = false,
   }: {
     asset: Asset;
     accountAddress: string;
@@ -762,7 +763,8 @@ export class OpenSeaPort {
     paymentTokenAddress?: string;
     sellOrder?: Order;
     referrerAddress?: string;
-  }): Promise<Order> {
+    payloadOnly?: boolean;
+  }): Promise<Order | any> {
     paymentTokenAddress =
       paymentTokenAddress ||
       WyvernSchemas.tokens[this._networkName].canonicalWrappedEther.address;
@@ -790,6 +792,12 @@ export class OpenSeaPort {
       ...order,
       hash: getOrderHash(order),
     };
+
+    if (payloadOnly) {
+      const payload = this.getOrderPayload(hashedOrder);
+      return payload;
+    }
+
     let signature;
     try {
       signature = await this.authorizeOrder(hashedOrder);
@@ -840,6 +848,7 @@ export class OpenSeaPort {
     extraBountyBasisPoints = 0,
     buyerAddress,
     buyerEmail,
+    payloadOnly = false,
   }: {
     asset: Asset;
     accountAddress: string;
@@ -854,7 +863,8 @@ export class OpenSeaPort {
     extraBountyBasisPoints?: number;
     buyerAddress?: string;
     buyerEmail?: string;
-  }): Promise<Order> {
+    payloadOnly?: boolean;
+  }): Promise<Order | any> {
     const order = await this._makeSellOrder({
       asset,
       quantity,
@@ -878,6 +888,12 @@ export class OpenSeaPort {
       ...order,
       hash: getOrderHash(order),
     };
+
+    if (payloadOnly) {
+      const payload = this.getOrderPayload(hashedOrder);
+      return payload;
+    }
+
     let signature;
     try {
       signature = await this.authorizeOrder(hashedOrder);
@@ -1009,6 +1025,7 @@ export class OpenSeaPort {
           "You declined to authorize your auction, or your web3 provider can't sign using personal_sign. Try 'web3-provider-engine' and make sure a mnemonic is set. Just a reminder: there's no gas needed anymore to mint tokens!"
         );
       }
+      // check here
 
       const orderWithSignature = {
         ...hashedOrder,
@@ -1163,11 +1180,13 @@ export class OpenSeaPort {
     accountAddress,
     recipientAddress,
     referrerAddress,
+    payloadOnly,
   }: {
     order: Order;
     accountAddress: string;
     recipientAddress?: string;
     referrerAddress?: string;
+    payloadOnly?: boolean;
   }): Promise<string> {
     const matchingOrder = this._makeMatchingOrder({
       order,
@@ -1183,7 +1202,11 @@ export class OpenSeaPort {
       sell,
       accountAddress,
       metadata,
+      payloadOnly,
     });
+    if (payloadOnly) {
+      return transactionHash;
+    }
 
     await this._confirmTransaction(
       transactionHash,
@@ -4035,11 +4058,13 @@ export class OpenSeaPort {
     sell,
     accountAddress,
     metadata = NULL_BLOCK_HASH,
+    payloadOnly = false,
   }: {
     buy: Order;
     sell: Order;
     accountAddress: string;
     metadata?: string;
+    payloadOnly?: boolean;
   }) {
     let value;
     let shouldValidateBuy = true;
@@ -4185,6 +4210,24 @@ export class OpenSeaPort {
     // Then do the transaction
     try {
       this.logger(`Fulfilling order with gas set to ${txnData.gas}`);
+      if (payloadOnly) {
+        const payload = await this._wyvernProtocol.wyvernExchange
+          .atomicMatch_(
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+            args[6],
+            args[7],
+            args[8],
+            args[9],
+            args[10]
+          )
+          .getABIEncodedTransactionData();
+        return payload;
+      }
       txHash = await this._wyvernProtocol.wyvernExchange
         .atomicMatch_(
           args[0],
@@ -4312,6 +4355,68 @@ export class OpenSeaPort {
         signerAddress
       );
       return { ...ecSignature, nonce: signerOrderNonce.toNumber() };
+    } catch (error) {
+      this._dispatch(EventType.OrderDenied, {
+        order,
+        accountAddress: signerAddress,
+      });
+      throw error;
+    }
+  }
+
+  public async getOrderPayload(order: UnsignedOrder): Promise<any | null> {
+    const signerAddress = order.maker;
+
+    this._dispatch(EventType.CreateOrder, {
+      order,
+      accountAddress: order.maker,
+    });
+
+    try {
+      // 2.3 Sign order flow using EIP-712
+      const signerOrderNonce = await this.getNonce(signerAddress);
+
+      // We need to manually specify each field because OS orders can contain unrelated data
+      const orderForSigning: RawWyvernOrderJSON = {
+        maker: order.maker,
+        exchange: order.exchange,
+        taker: order.taker,
+        makerRelayerFee: order.makerRelayerFee.toString(),
+        takerRelayerFee: order.takerRelayerFee.toString(),
+        makerProtocolFee: order.makerProtocolFee.toString(),
+        takerProtocolFee: order.takerProtocolFee.toString(),
+        feeRecipient: order.feeRecipient,
+        feeMethod: order.feeMethod,
+        side: order.side,
+        saleKind: order.saleKind,
+        target: order.target,
+        howToCall: order.howToCall,
+        calldata: order.calldata,
+        replacementPattern: order.replacementPattern,
+        staticTarget: order.staticTarget,
+        staticExtradata: order.staticExtradata,
+        paymentToken: order.paymentToken,
+        basePrice: order.basePrice.toString(),
+        extra: order.extra.toString(),
+        listingTime: order.listingTime.toString(),
+        expirationTime: order.expirationTime.toString(),
+        salt: order.salt.toString(),
+      };
+
+      // We don't JSON.stringify as certain wallet providers sanitize this data
+      // https://github.com/coinbase/coinbase-wallet-sdk/issues/60
+      const message = {
+        types: EIP_712_ORDER_TYPES,
+        domain: {
+          name: EIP_712_WYVERN_DOMAIN_NAME,
+          version: EIP_712_WYVERN_DOMAIN_VERSION,
+          chainId: this._networkName == Network.Main ? 1 : 4,
+          verifyingContract: order.exchange,
+        },
+        primaryType: "Order",
+        message: { ...orderForSigning, nonce: signerOrderNonce.toNumber() },
+      };
+      return message;
     } catch (error) {
       this._dispatch(EventType.OrderDenied, {
         order,
