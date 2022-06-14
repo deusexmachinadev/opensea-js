@@ -753,7 +753,7 @@ export class OpenSeaPort {
     paymentTokenAddress,
     sellOrder,
     referrerAddress,
-    payloadOnly = false,
+    payloadOnly = true,
   }: {
     asset: Asset;
     accountAddress: string;
@@ -787,7 +787,8 @@ export class OpenSeaPort {
     // NOTE not in Wyvern exchange code:
     // frontend checks to make sure
     // token is approved and sufficiently available
-    await this._buyOrderValidationAndApprovals({ order, accountAddress });
+    // await this._buyOrderValidationAndApprovals({ order, accountAddress });
+
     const hashedOrder = {
       ...order,
       hash: getOrderHash(order),
