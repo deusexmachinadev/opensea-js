@@ -114,6 +114,7 @@ import {
   encodeTransferCall,
 } from "./utils/schema";
 import {
+  parseSignatureHex,
   annotateERC20TransferABI,
   annotateERC721TransferABI,
   assignOrdersToSides,
@@ -744,6 +745,11 @@ export class OpenSeaPort {
    * @param sellOrder Optional sell order (like an English auction) to ensure fee and schema compatibility
    * @param referrerAddress The optional address that referred the order
    */
+
+  public async parseSignatureHex({ signature }: { signature: string }) {
+    return parseSignatureHex(signature);
+  }
+
   public async createBuyOrder({
     asset,
     accountAddress,
@@ -795,8 +801,8 @@ export class OpenSeaPort {
     };
 
     if (payloadOnly) {
-      const payload = this.getOrderPayload(hashedOrder);
-      return payload;
+      const payload = await this.getOrderPayload(hashedOrder);
+      return { payload, hashedOrder };
     }
 
     let signature;
@@ -892,7 +898,7 @@ export class OpenSeaPort {
 
     if (payloadOnly) {
       const payload = this.getOrderPayload(hashedOrder);
-      return payload;
+      return { payload, hashedOrder };
     }
 
     let signature;
