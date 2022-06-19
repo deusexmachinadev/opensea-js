@@ -898,7 +898,7 @@ export class OpenSeaPort {
     };
 
     if (payloadOnly) {
-      const payload = this.getOrderPayload(hashedOrder);
+      const payload = await this.getOrderPayload(hashedOrder);
       return { payload, hashedOrder };
     }
 
