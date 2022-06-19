@@ -746,7 +746,7 @@ export class OpenSeaPort {
    * @param referrerAddress The optional address that referred the order
    */
 
-  public async parseSignatureHex({ signature }: { signature: string }) {
+  public async parseSignatureHex(signature: string) {
     return parseSignatureHex(signature);
   }
 
@@ -817,6 +817,7 @@ export class OpenSeaPort {
       ...hashedOrder,
       ...signature,
     };
+
     return this.validateAndPostOrder(orderWithSignature);
   }
 

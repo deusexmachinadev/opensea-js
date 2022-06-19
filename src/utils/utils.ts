@@ -552,6 +552,13 @@ export async function signTypedDataAsync(
 ): Promise<ECSignature> {
   let signature: JsonRpcResponse | undefined;
   try {
+    throw 500;
+    console.log(web3, message, signerAddress, "just testtt");
+  } catch {
+    //test
+  }
+
+  try {
     // Using sign typed data V4 works with a stringified message, used by browser providers i.e. Metamask
     signature = await promisify<JsonRpcResponse | undefined>((c) =>
       (web3.currentProvider as AbstractProvider).sendAsync(
@@ -587,7 +594,6 @@ export async function signTypedDataAsync(
   if (error) {
     throw new Error(error);
   }
-
   return parseSignatureHex(signature?.result);
 }
 
@@ -769,7 +775,6 @@ export function parseSignatureHex(signature: string): ECSignature {
   // return the signature params in different orders. In order to support all client implementations,
   // we parse the signature in both ways, and evaluate if either one is a valid signature.
   const validVParamValues = [27, 28];
-
   const ecSignatureRSV = _parseSignatureHexAsRSV(signature);
   if (_.includes(validVParamValues, ecSignatureRSV.v)) {
     return ecSignatureRSV;
