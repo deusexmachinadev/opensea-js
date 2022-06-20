@@ -1582,6 +1582,8 @@ export class OpenSeaPort {
       });
     }
 
+    // check hereee
+
     const txHash = await sendRawTransaction(
       this.web3,
       {
@@ -1613,6 +1615,46 @@ export class OpenSeaPort {
       }
     );
     return txHash;
+  }
+
+  public async approveFungibleTokenPayloadOnly({
+    accountAddress,
+    tokenAddress,
+    proxyAddress,
+    minimumAmount = WyvernProtocol.MAX_UINT_256,
+  }: {
+    accountAddress: string;
+    tokenAddress: string;
+    proxyAddress?: string;
+    minimumAmount?: BigNumber;
+  }): Promise<string | any> {
+    proxyAddress =
+      proxyAddress ||
+      this._wyvernConfigOverride?.wyvernTokenTransferProxyContractAddress ||
+      WyvernProtocol.getTokenTransferProxyAddress(this._networkName);
+
+    const approvedAmount = await this._getApprovedTokenCount({
+      accountAddress,
+      tokenAddress,
+      proxyAddress,
+    });
+
+    if (approvedAmount.isGreaterThanOrEqualTo(minimumAmount)) {
+      this.logger("Already approved enough currency for trading");
+      return null;
+    }
+
+    return {
+      from: accountAddress,
+      to: tokenAddress,
+      value: "0",
+      data: encodeCall(
+        getMethod(ERC20, "approve"),
+        // Always approve maximum amount, to prevent the need for followup
+        // transactions (and because old ERC20s like MANA/ENJ are non-compliant)
+        [proxyAddress, WyvernProtocol.MAX_UINT_256.toString()]
+      ),
+    };
   }
 
   /**
