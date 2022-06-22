@@ -1205,6 +1205,7 @@ export class OpenSeaPort {
     const { buy, sell } = assignOrdersToSides(order, matchingOrder);
 
     const metadata = this._getMetadata(order, referrerAddress);
+
     const transactionHash = await this._atomicMatch({
       buy,
       sell,
@@ -4117,48 +4118,50 @@ export class OpenSeaPort {
     payloadOnly?: boolean;
   }) {
     let value;
-    let shouldValidateBuy = true;
-    let shouldValidateSell = true;
+    const shouldValidateBuy = true;
+    const shouldValidateSell = true;
 
-    // Only check buy, but shouldn't matter as they should always be equal
-    if (sell.maker.toLowerCase() == accountAddress.toLowerCase()) {
-      // USER IS THE SELLER, only validate the buy order
-      await this._sellOrderValidationAndApprovals({
-        order: sell,
-        accountAddress,
-      });
-      shouldValidateSell = false;
-    } else if (buy.maker.toLowerCase() == accountAddress.toLowerCase()) {
-      // USER IS THE BUYER, only validate the sell order
-      await this._buyOrderValidationAndApprovals({
-        order: buy,
-        counterOrder: sell,
-        accountAddress,
-      });
-      shouldValidateBuy = false;
+    // check Here
 
-      // If using ETH to pay, set the value of the transaction to the current price
-      if (buy.paymentToken == NULL_ADDRESS) {
-        value = await this._getRequiredAmountForTakingSellOrder(sell);
-      }
-    } else {
-      // User is neither - matching service
-    }
+    // // Only check buy, but shouldn't matter as they should always be equal
+    // if (sell.maker.toLowerCase() == accountAddress.toLowerCase()) {
+    //   // USER IS THE SELLER, only validate the buy order
+    //   await this._sellOrderValidationAndApprovals({
+    //     order: sell,
+    //     accountAddress,
+    //   });
+    //   shouldValidateSell = false;
+    // } else if (buy.maker.toLowerCase() == accountAddress.toLowerCase()) {
+    //   // USER IS THE BUYER, only validate the sell order
+    //   await this._buyOrderValidationAndApprovals({
+    //     order: buy,
+    //     counterOrder: sell,
+    //     accountAddress,
+    //   });
+    //   shouldValidateBuy = false;
 
-    await this._validateMatch({
-      buy,
-      sell,
-      accountAddress,
-      shouldValidateBuy,
-      shouldValidateSell,
-    });
+    //   // If using ETH to pay, set the value of the transaction to the current price
+    //   if (buy.paymentToken == NULL_ADDRESS) {
+    //     value = await this._getRequiredAmountForTakingSellOrder(sell);
+    //   }
+    // } else {
+    //   // User is neither - matching service
+    // }
 
-    this._dispatch(EventType.MatchOrders, {
-      buy,
-      sell,
-      accountAddress,
-      matchMetadata: metadata,
-    });
+    // await this._validateMatch({
+    //   buy,
+    //   sell,
+    //   accountAddress,
+    //   shouldValidateBuy,
+    //   shouldValidateSell,
+    // });
+
+    // this._dispatch(EventType.MatchOrders, {
+    //   buy,
+    //   sell,
+    //   accountAddress,
+    //   matchMetadata: metadata,
+    // });
 
     let txHash;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -4226,38 +4229,39 @@ export class OpenSeaPort {
       ],
     ];
 
-    // Estimate gas first
-    try {
-      // Typescript splat doesn't typecheck
-      const gasEstimate = await this._wyvernProtocolReadOnly.wyvernExchange
-        .atomicMatch_(
-          args[0],
-          args[1],
-          args[2],
-          args[3],
-          args[4],
-          args[5],
-          args[6],
-          args[7],
-          args[8],
-          args[9],
-          args[10]
-        )
-        .estimateGasAsync(txnData);
+    // // Estimate gas first
+    // try {
+    //   // Typescript splat doesn't typecheck
+    //   const gasEstimate = await this._wyvernProtocolReadOnly.wyvernExchange
+    //     .atomicMatch_(
+    //       args[0],
+    //       args[1],
+    //       args[2],
+    //       args[3],
+    //       args[4],
+    //       args[5],
+    //       args[6],
+    //       args[7],
+    //       args[8],
+    //       args[9],
+    //       args[10]
+    //     )
+    //     .estimateGasAsync(txnData);
 
-      txnData.gas = this._correctGasAmount(gasEstimate);
-    } catch (error) {
-      console.error(`Failed atomic match with args: `, args, error);
-      throw new Error(
-        `Oops, the Ethereum network rejected this transaction :( The OpenSea devs have been alerted, but this problem is typically due an item being locked or untransferrable. The exact error was "${
-          error instanceof Error
-            ? error.message.substr(0, MAX_ERROR_LENGTH)
-            : "unknown"
-        }..."`
-      );
-    }
+    //   txnData.gas = this._correctGasAmount(gasEstimate);
+    // } catch (error) {
+    //   console.error(`Failed atomic match with args: `, args, error);
+    //   throw new Error(
+    //     `Oops, the Ethereum network rejected this transaction :( The OpenSea devs have been alerted, but this problem is typically due an item being locked or untransferrable. The exact error was "${
+    //       error instanceof Error
+    //         ? error.message.substr(0, MAX_ERROR_LENGTH)
+    //         : "unknown"
+    //     }..."`
+    //   );
+    // }
 
     // Then do the transaction
+    console.log(MAX_ERROR_LENGTH, shouldValidateBuy, shouldValidateSell);
     try {
       this.logger(`Fulfilling order with gas set to ${txnData.gas}`);
       if (payloadOnly) {
